@@ -1,5 +1,6 @@
 import sys
 import os 
+import subprocess
 
 shell_built_in = {"echo", "exit", "type"}
 
@@ -12,25 +13,35 @@ def main():
         if len(user_input) == 0:
             continue
         else:
-            status = check_arguments(user_input)
+            status = check_command(user_input)
 
-def check_arguments(user_input):
+def check_command(user_input):
     command = user_input[0]
     arguments = user_input[1:]
-    if command == "echo":
-        print(echo(arguments))
-        return True
-    elif command == "exit":
-        return False
-    elif command == "type":
-        if len(arguments) == 0:
+    if command in shell_built_in:
+        if command == "echo":
+            print(echo(arguments))
             return True
-        else:
-            print(type(user_input))
-            return True
+        elif command == "exit":
+            return False
+        elif command == "type":
+            if len(arguments) == 0:
+                return True
+            else:
+                print(type(user_input))
+                return True
     else:
+        path_string = os.environ["PATH"]
+        directories = path_string.split(os.pathsep)
+        for current_path in directories:
+            absolute_path = os.path.join(current_path, command)
+            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
+                subprocess.run([command] + arguments)
+                return True
         print(f"{command}: command not found")
         return True
+
+        
 
 def echo(arguments):
     output = " ".join(arguments)
@@ -49,8 +60,6 @@ def type(user_input):
         directories = path_string.split(os.pathsep)
         # check each directory 
         for current_path in directories:
-            if not os.path.isdir(current_path):
-                continue
             # create absolute path
             absolute_path = os.path.join(current_path, command_type_func)
             # check for existence and execute permission 
