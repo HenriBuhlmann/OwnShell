@@ -4,6 +4,7 @@ import os
 shell_built_in = {"echo", "exit", "type"}
 
 def main():
+    # REPL
     status = True
     while status:
         sys.stdout.write("$ ")
@@ -25,7 +26,7 @@ def check_arguments(user_input):
         if len(arguments) == 0:
             return True
         else:
-            print(type(arguments))
+            print(type(user_input))
             return True
     else:
         print(f"{command}: command not found")
@@ -35,8 +36,8 @@ def echo(arguments):
     output = " ".join(arguments)
     return output
 
-def type(arguments):
-    command_type_func = arguments[0]
+def type(user_input):
+    command_type_func = user_input[1]
     global shell_built_in  
     # check if command_type_func is builtin
     if command_type_func in shell_built_in:
@@ -48,15 +49,14 @@ def type(arguments):
         directories = path_string.split(os.pathsep)
         # check each directory 
         for current_path in directories:
+            if not os.path.isdir(current_path):
+                continue
             # create absolute path
             absolute_path = os.path.join(current_path, command_type_func)
             # check for existence and execute permission 
-            if os.path.exists(absolute_path):
-                if os.access(absolute_path, os.X_OK):
+            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
                     output = f"{command_type_func} is {absolute_path}"
                     return output
-                else:   
-                    continue
             else:
                     continue
         output = f"{command_type_func}: not found"
