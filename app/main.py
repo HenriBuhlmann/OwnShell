@@ -1,4 +1,5 @@
 import sys
+import os 
 
 shell_built_in = {"echo", "exit", "type"}
 
@@ -10,9 +11,9 @@ def main():
         if len(user_input) == 0:
             continue
         else:
-            status = check_command(user_input)
+            status = check_arguments(user_input)
 
-def check_command(user_input):
+def check_arguments(user_input):
     command = user_input[0]
     arguments = user_input[1:]
     if command == "echo":
@@ -35,23 +36,32 @@ def echo(arguments):
     return output
 
 def type(arguments):
-    global shell_built_in
-    if arguments[0] in shell_built_in:
-        output = f"{arguments[0]} is a shell builtin"
+    command_type_func = arguments[0]
+    global shell_built_in  
+    # check if command_type_func is builtin
+    if command_type_func in shell_built_in:
+        output = f"{command_type_func} is a shell builtin"
         return output
     else:
-        output = f"{arguments[0]}: not found"
+        # check if command is in directory in $PATH
+        path_string = os.environ["PATH"]
+        directories = path_string.split(os.pathsep)
+        # check each directory 
+        for current_path in directories:
+            # create absolute path
+            absolute_path = os.path.join(current_path, command_type_func)
+            # check for existence and execute permission 
+            if os.path.exists(absolute_path):
+                if os.access(absolute_path, os.X_OK):
+                    output = f"{command_type_func} is {absolute_path}"
+                    return output
+                else:   
+                    continue
+            else:
+                    continue
+        output = f"{command_type_func}: not found"
         return output
-
-
-
-
-
-
-
-
- 
-
+        
 if __name__ == "__main__":
     main()
 
