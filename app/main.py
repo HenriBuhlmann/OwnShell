@@ -2,10 +2,9 @@ import sys
 import os 
 import subprocess
 
-shell_built_in = {"echo", "exit", "type", "pwd"}
+shell_built_in = {"echo", "exit", "type", "pwd", "cd"}
 
 def main():
-    # REPL
     status = True
     while status:
         sys.stdout.write("$ ")
@@ -31,7 +30,10 @@ def check_command(user_input):
                 print(type(user_input))
                 return True
         elif command == "pwd":
-            print(os.getcwd())
+            print(pwd())
+            return True
+        elif command == "cd":
+            cd(arguments)
             return True
     else:
         path_string = os.environ["PATH"]
@@ -73,6 +75,22 @@ def type(user_input):
                     continue
         output = f"{command_type_func}: not found"
         return output
+
+def pwd():
+    pwd = os.getcwd()
+    return pwd
+
+def cd(absolute_path):
+    if os.path.exists(absolute_path[0]):
+        os.chdir(absolute_path[0])
+    else: 
+        print(f"cd: {absolute_path[0]}: No such file or directory")
+
+
+
+
+
+
         
 if __name__ == "__main__":
     main()
