@@ -2,7 +2,7 @@ import sys
 import os 
 import subprocess
 
-shell_built_in = {"echo", "exit", "type"}
+shell_built_in = {"echo", "exit", "type", "pwd"}
 
 def main():
     # REPL
@@ -30,6 +30,9 @@ def check_command(user_input):
             else:
                 print(type(user_input))
                 return True
+        elif command == "pwd":
+            print(os.getcwd())
+            return True
     else:
         path_string = os.environ["PATH"]
         directories = path_string.split(os.pathsep)
