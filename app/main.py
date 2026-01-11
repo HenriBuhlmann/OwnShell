@@ -2,96 +2,103 @@ import sys
 import os 
 import subprocess
 
-shell_built_in = {"echo", "exit", "type", "pwd", "cd"}
+SHELL_BUILTINS = {"echo", "exit", "type", "pwd", "cd"}
 
 def main():
-    status = True
-    while status:
+    running = True
+    while running:
         sys.stdout.write("$ ")
-        user_input = input().split()
-        if len(user_input) == 0:
+        tokens = input().split()
+        if not tokens:
             continue
         else:
-            status = check_command(user_input)
+            running = handle_command(tokens)
 
-def check_command(user_input):
-    command = user_input[0]
-    arguments = user_input[1:]
-    if command in shell_built_in:
-        if command == "echo":
-            print(echo(arguments))
-            return True
-        elif command == "exit":
-            return False
-        elif command == "type":
-            if len(arguments) == 0:
-                return True
-            else:
-                print(type(user_input))
-                return True
-        elif command == "pwd":
-            print(pwd())
-            return True
-        elif command == "cd":
-            cd(arguments)
-            return True
+
+def handle_command(tokens):
+    command, arguments = parse_input(tokens)
+    
+    if command in SHELL_BUILTINS:
+        return run_builtin(command, arguments, tokens)
     else:
-        path_string = os.environ["PATH"]
-        directories = path_string.split(os.pathsep)
-        for current_path in directories:
-            absolute_path = os.path.join(current_path, command)
-            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
-                subprocess.run([command] + arguments)
-                return True
-        print(f"{command}: command not found")
+        return run_external(command, arguments)
+    
+
+def parse_input(tokens):
+    command = tokens[0]
+    arguments = tokens[1:]
+    return command, arguments
+
+
+def run_builtin(command, arguments, tokens):
+    if command == "echo":
+        print(echo_cmd(arguments))
+        return True
+    
+    if command == "exit":
+        return False
+    
+    if command == "type":
+        if arguments:
+            print(type_cmd(tokens))
+        return True
+        
+    if command == "pwd":
+        print(pwd_cmd())
+        return True
+    
+    if  command == "cd":
+        cd_cmd(arguments)
         return True
 
         
-
-def echo(arguments):
-    output = " ".join(arguments)
-    return output
-
-def type(user_input):
-    command_type_func = user_input[1]
-    global shell_built_in  
-    # check if command_type_func is builtin
-    if command_type_func in shell_built_in:
-        output = f"{command_type_func} is a shell builtin"
-        return output
-    else:
-        # check if command is in directory in $PATH
-        path_string = os.environ["PATH"]
-        directories = path_string.split(os.pathsep)
-        # check each directory 
-        for current_path in directories:
-            # create absolute path
-            absolute_path = os.path.join(current_path, command_type_func)
-            # check for existence and execute permission 
-            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
-                    output = f"{command_type_func} is {absolute_path}"
-                    return output
-            else:
-                    continue
-        output = f"{command_type_func}: not found"
-        return output
-
-def pwd():
-    pwd = os.getcwd()
-    return pwd
-
-def cd(absolute_path):
-    if os.path.exists(absolute_path[0]):
-        os.chdir(absolute_path[0])
-    else: 
-        print(f"cd: {absolute_path[0]}: No such file or directory")
-
-
-
-
-
-
+def run_external(command, arguments):
+    for directory in os.environ["PATH"].split(os.pathsep):
+        absolute_path = os.path.join(directory, command)
+        if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
+            subprocess.run([command] + arguments)
+            return True
         
+    print(f"{command}: command not found")
+    return True
+
+
+def echo_cmd(arguments):
+    return " ".join(arguments)
+     
+
+def type_cmd(tokens):
+    target = tokens[1]
+
+    if target in SHELL_BUILTINS:
+        return f"{target} is a shell builtin"
+
+    for directory in os.environ["PATH"].split(os.pathsep):
+            absolute_path = os.path.join(directory, target)
+            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
+                    return f"{target} is {absolute_path}"
+            
+    return f"{target}: not found"
+        
+
+def pwd_cmd():
+    return os.getcwd()
+
+
+def cd_cmd(arguments):
+    if not arguments:
+        return
+    
+    path = arguments[0]
+
+    if path[0] == "~":
+        os.chdir(os.environ["HOME"])
+    elif os.path.exists(path):
+        os.chdir(path)
+    else: 
+        print(f"cd: {path}: No such file or directory")
+        
+
 if __name__ == "__main__":
     main()
 
