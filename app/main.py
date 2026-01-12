@@ -7,21 +7,47 @@ SHELL_BUILTINS = {"echo", "exit", "type", "pwd", "cd"}
 def main():
     running = True
     while running:
-        sys.stdout.write("$ ")
-        tokens = input().split()
+        sys.stdout.write("$ ") 
+        tokens = tokenize_input(input())
         if not tokens:
             continue
         else:
             running = handle_command(tokens)
+
+          
+def tokenize_input(input_line):
+    current_token  = ""
+    token_list  = []
+    inside_single_quote = False
+    for char in input_line:
+        if inside_single_quote:
+            if char == "'":
+                inside_single_quote = not inside_single_quote
+            else:
+                current_token  = current_token  + char
+        else:
+            if char == " ":
+                if not current_token :
+                    continue
+                else:
+                    token_list .append(current_token )
+                    current_token  = ""
+            elif char == "'":
+                inside_single_quote = not inside_single_quote
+            else:
+                current_token  = current_token  + char
+    if current_token :
+        token_list .append(current_token )
+    return token_list 
 
 
 def handle_command(tokens):
     command, arguments = parse_input(tokens)
     
     if command in SHELL_BUILTINS:
-        return run_builtin(command, arguments, tokens)
+        return execute_builtin(command, arguments, tokens)
     else:
-        return run_external(command, arguments)
+        return execute_external(command, arguments)
     
 
 def parse_input(tokens):
@@ -30,7 +56,7 @@ def parse_input(tokens):
     return command, arguments
 
 
-def run_builtin(command, arguments, tokens):
+def execute_builtin(command, arguments, tokens):
     if command == "echo":
         print(echo_cmd(arguments))
         return True
@@ -52,7 +78,7 @@ def run_builtin(command, arguments, tokens):
         return True
 
         
-def run_external(command, arguments):
+def execute_external(command, arguments):
     for directory in os.environ["PATH"].split(os.pathsep):
         absolute_path = os.path.join(directory, command)
         if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
@@ -89,9 +115,13 @@ def cd_cmd(arguments):
     if not arguments:
         return
     
+    if len(arguments) >= 2:
+        print("cd: too many arguments")
+        return
+    
     path = arguments[0]
 
-    if path[0] == "~":
+    if path == "~":
         os.chdir(os.environ["HOME"])
     elif os.path.exists(path):
         os.chdir(path)
