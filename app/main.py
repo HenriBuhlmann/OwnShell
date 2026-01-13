@@ -20,17 +20,21 @@ def tokenize_input(input_line):
     token_list  = []
     inside_single_quote = False
     inside_double_quotes = False
+    escaped = False
     for char in input_line:
         if inside_single_quote:
             if char == "'":
                 inside_single_quote = not inside_single_quote
             else:
-                current_token  = current_token  + char
+                current_token += char
         elif inside_double_quotes:
             if char == '"':
                 inside_double_quotes = not inside_double_quotes
             else:
-                current_token  = current_token  + char
+                current_token += char
+        elif escaped:
+            current_token += char
+            escaped = False
         else:
             if char == " ":
                 if not current_token :
@@ -41,11 +45,13 @@ def tokenize_input(input_line):
             elif char == "'":
                 inside_single_quote = not inside_single_quote
             elif char == '"':
-                inside_double_quotes = not inside_double_quotes
+                inside_double_quotes = not inside_double_quotes   
+            elif char == "\\":
+                escaped =True             
             else:
-                current_token  = current_token  + char
+                current_token += char
     if current_token:
-        token_list .append(current_token )
+        token_list.append(current_token )
     return token_list 
 
 
