@@ -28,8 +28,22 @@ def tokenize_input(input_line):
             else:
                 current_token += char
         elif inside_double_quotes:
-            if char == '"':
-                inside_double_quotes = not inside_double_quotes
+            if char == "\\":
+                if escaped:
+                    current_token += char
+                    escaped = False
+                else:
+                    escaped = True
+            elif char == '"':
+                if escaped:
+                    current_token += char
+                    escaped = False
+                else:
+                    inside_double_quotes = not inside_double_quotes
+            elif escaped:
+                current_token += "\\"
+                current_token += char
+                escaped = False
             else:
                 current_token += char
         elif escaped:
@@ -47,7 +61,7 @@ def tokenize_input(input_line):
             elif char == '"':
                 inside_double_quotes = not inside_double_quotes   
             elif char == "\\":
-                escaped =True             
+                escaped = True             
             else:
                 current_token += char
     if current_token:
