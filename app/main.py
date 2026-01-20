@@ -117,9 +117,11 @@ def handle_command(tokens):
 
 def parse_input(tokens):
     redirect = None
+    
+    symbols = {">", "1>", "2>", ">>", "1>>"}
 
     for position, current_item in enumerate(tokens):
-        if current_item == ">" or current_item =="1>" or current_item =="2>":
+        if current_item in symbols:
             redirect = tokens[position + 1]
             command = tokens[0]
             arguments = tokens[1:position]
@@ -147,11 +149,15 @@ def execute_external(command, arguments, redirect, operation):
                     with open(redirect, "w") as f:
                         subprocess.run([absolute_path] + arguments, stdout=f)
                     return True
-                else:
+                elif operation == "2>":
                     os.makedirs(os.path.dirname(redirect), exist_ok=True)
                     with open(redirect, "w") as f:
                         subprocess.run([absolute_path] + arguments, stderr=f)
                     return True
+                else:
+                    with open(redirect, "a") as f:
+                        subprocess.run([absolute_path] + arguments, stdout=f)
+                        return True
             else:
                 subprocess.run([command] + arguments, executable=absolute_path)                
                 return True
@@ -165,20 +171,20 @@ def echo_cmd(arguments, redirect, operation):
 
     if redirect:
         directory = os.path.dirname(redirect)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
+        os.makedirs(directory, exist_ok=True)
 
     if operation == ">" or operation == "1>":
         with open(redirect, "w") as f:
             print(output, file=f)
-
         return True
-    
     elif operation =="2>":
         open(redirect, "w").close()
         print(output)
         return True
-    
+    elif operation == ">>" or operation == "1>>":
+        with open(redirect, "a") as f:
+            print(output, file=f)
+        return True
     else:
         print(output)
         return True
