@@ -2,7 +2,90 @@ import sys
 import os 
 import subprocess
 
-SHELL_BUILTINS = {"echo", "exit", "type", "pwd", "cd"}
+def echo_cmd(arguments, redirect):
+    
+    if redirect:
+        with open(redirect, 'w') as f:
+            print(" ".join(arguments), file=f)
+            return True
+    else:
+        print(" ".join(arguments))
+        return True
+
+
+def exit_cmd(arguments=None, redirect=None):
+    return False
+     
+
+def type_cmd(arguments, redirect):
+    if not arguments:
+        return True
+    
+    target = arguments[0]
+
+    if target in shell_builtins:
+        if redirect:
+            with open(redirect, 'w') as f:
+                print(f"{target} is a shell builtin", file=f)
+                return True
+        else:
+            print( f"{target} is a shell builtin")
+            return True
+        
+    for directory in os.environ["PATH"].split(os.pathsep):
+            absolute_path = os.path.join(directory, target)
+            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
+                    if redirect:
+                        with open(redirect, 'w') as f:
+                            print(f"{target} is {absolute_path}", file=f)
+                            return True
+                    else:
+                        print(f"{target} is {absolute_path}") 
+                        return True
+    if redirect:
+        with open(redirect, 'w') as f:
+            print(f"{target}: not found", file=f)
+            return True 
+    else:
+        print(f"{target}: not found") 
+        return True
+
+
+def pwd_cmd(arguments, redirect):
+    if redirect:
+         with open(redirect, 'w') as f:
+            print(os.getcwd(), file=f)
+            return True
+    else:
+        print(os.getcwd())
+        return True 
+
+
+def cd_cmd(arguments, redirect):
+    if not arguments:
+        return True
+
+    if len(arguments) >= 2:
+        print("cd: too many arguments")
+        return True
+    
+    path = arguments[0]
+
+    if path == "~":
+        os.chdir(os.environ["HOME"])
+    elif os.path.exists(path):
+        os.chdir(path)
+    else: 
+        print(f"cd: {path}: No such file or directory")
+    return True
+
+shell_builtins = {"echo": echo_cmd,
+                  "exit": exit_cmd,
+                  "type": type_cmd,
+                  "pwd": pwd_cmd, 
+                  "cd": cd_cmd
+                  }
+
 
 def main():
     running = True
@@ -14,148 +97,145 @@ def main():
         else:
             running = handle_command(tokens)
 
-          
+
 def tokenize_input(input_line):
-    current_token  = ""
-    token_list  = []
-    inside_single_quote = False
-    inside_double_quotes = False
-    escaped = False
+    modes = {"normal":normal_mode,
+             "inside_single_quote":single_quote_mode,
+             "inside_double_quote":double_quote_mode,
+             "escaped_in_double_quote":escaped_in_double_quote_mode,
+             "escaped":escaped_mode
+    }
+
+    current_token = ""
+    current_mode = "normal"
+    token_list = []
+
     for char in input_line:
-        if inside_single_quote:
-            if char == "'":
-                inside_single_quote = not inside_single_quote
-            else:
-                current_token += char
-        elif inside_double_quotes:
-            if char == "\\":
-                if escaped:
-                    current_token += char
-                    escaped = False
-                else:
-                    escaped = True
-            elif char == '"':
-                if escaped:
-                    current_token += char
-                    escaped = False
-                else:
-                    inside_double_quotes = not inside_double_quotes
-            elif escaped:
-                current_token += "\\"
-                current_token += char
-                escaped = False
-            else:
-                current_token += char
-        elif escaped:
-            current_token += char
-            escaped = False
-        else:
-            if char == " ":
-                if not current_token :
-                    continue
-                else:
-                    token_list .append(current_token )
-                    current_token  = ""
-            elif char == "'":
-                inside_single_quote = not inside_single_quote
-            elif char == '"':
-                inside_double_quotes = not inside_double_quotes   
-            elif char == "\\":
-                escaped = True             
-            else:
-                current_token += char
+        func = modes[current_mode]
+        current_token, current_mode, token_finished = func(char, current_token)
+        if token_finished:
+            if current_token:
+                token_list.append(current_token)
+                current_token = ""
     if current_token:
-        token_list.append(current_token )
-    return token_list 
+        token_list.append(current_token)
+    
+    return token_list
+  
+    
+def normal_mode(char, current_token):
+    token_finished = False
+    new_mode = "normal"
+    new_token = current_token
+    if char == " ":
+        token_finished = True
+    elif char == "\\":
+        new_mode = "escaped"
+    elif char == "'":
+        new_mode = "inside_single_quote"
+    elif char == '"':
+        new_mode = "inside_double_quote"
+    else:
+        new_token += char
+
+    return new_token, new_mode, token_finished 
+
+
+def single_quote_mode(char, current_token):
+    new_mode = "inside_single_quote"
+    new_token = current_token
+    token_finished = False
+    if char == "'":
+        new_mode = "normal"
+    else:
+        new_token += char
+
+    return new_token, new_mode, token_finished
+
+
+def double_quote_mode(char, current_token):
+    new_mode = "inside_double_quote"
+    new_token = current_token
+    token_finished = False
+    if char == '"':
+        new_mode = "normal"
+    elif char == "\\":
+        new_mode = "escaped_in_double_quote"
+    else:
+        new_token += char
+    
+    return new_token, new_mode, token_finished
+
+
+def escaped_in_double_quote_mode(char, current_token):
+    new_mode = "inside_double_quote"
+    new_token = current_token
+    token_finished = False
+
+    if char == '"' or char == "\\":
+        new_token += char
+    else:
+        new_token += "\\" + char
+        
+    return new_token, new_mode, token_finished
+
+
+def escaped_mode(char, current_token):
+    new_mode = "normal"
+    new_token = current_token
+    token_finished = False
+
+    new_token += char
+
+    return new_token, new_mode, token_finished
 
 
 def handle_command(tokens):
-    command, arguments = parse_input(tokens)
+    command, arguments, redirect = parse_input(tokens)
     
-    if command in SHELL_BUILTINS:
-        return execute_builtin(command, arguments, tokens)
+    if command in shell_builtins:
+        return execute_builtin(command, arguments, redirect)
     else:
-        return execute_external(command, arguments)
+        return execute_external(command, arguments, redirect)
     
 
 def parse_input(tokens):
+    redirect = None
+
+    for position, current_item in enumerate(tokens):
+        if current_item == ">" or current_item =="1>":
+            redirect = tokens[position + 1]
+            command = tokens[0]
+            arguments = tokens[1:position]
+            return command, arguments, redirect
+    
     command = tokens[0]
     arguments = tokens[1:]
-    return command, arguments
+
+    return command, arguments, None
 
 
-def execute_builtin(command, arguments, tokens):
-    if command == "echo":
-        print(echo_cmd(arguments))
-        return True
+def execute_builtin(command, arguments, redirect):
+        func = shell_builtins[command]
+        return func(arguments, redirect)
     
-    if command == "exit":
-        return False
-    
-    if command == "type":
-        if arguments:
-            print(type_cmd(tokens))
-        return True
-        
-    if command == "pwd":
-        print(pwd_cmd())
-        return True
-    
-    if  command == "cd":
-        cd_cmd(arguments)
-        return True
 
-        
-def execute_external(command, arguments):
+def execute_external(command, arguments, redirect):
     for directory in os.environ["PATH"].split(os.pathsep):
         absolute_path = os.path.join(directory, command)
         if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
-            subprocess.run([command] + arguments)
-            return True
-        
+            if redirect:
+                os.makedirs(os.path.dirname(redirect), exist_ok=True)
+                with open(redirect, "w") as f:
+                    subprocess.run([absolute_path] + arguments, stdout=f)
+                return True
+            else:
+                subprocess.run([command] + arguments, executable=absolute_path)                
+                return True
+            
     print(f"{command}: command not found")
     return True
 
-
-def echo_cmd(arguments):
-    return " ".join(arguments)
-     
-
-def type_cmd(tokens):
-    target = tokens[1]
-
-    if target in SHELL_BUILTINS:
-        return f"{target} is a shell builtin"
-
-    for directory in os.environ["PATH"].split(os.pathsep):
-            absolute_path = os.path.join(directory, target)
-            if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
-                    return f"{target} is {absolute_path}"
-            
-    return f"{target}: not found"
-        
-
-def pwd_cmd():
-    return os.getcwd()
-
-
-def cd_cmd(arguments):
-    if not arguments:
-        return
-    
-    if len(arguments) >= 2:
-        print("cd: too many arguments")
-        return
-    
-    path = arguments[0]
-
-    if path == "~":
-        os.chdir(os.environ["HOME"])
-    elif os.path.exists(path):
-        os.chdir(path)
-    else: 
-        print(f"cd: {path}: No such file or directory")
-        
 
 if __name__ == "__main__":
     main()
