@@ -2,16 +2,14 @@ import sys
 import os 
 import subprocess
 
+symbols = {">":["w", "stdout"],
+           "1>":["w", "stdout"],
+           "2>":["w", "stderr"],
+           ">>":["a", "stdout"],
+           "1>>":["a", "stdout"],
+           "2>>":["a", "stderr"]}
 
-def main():
-    running = True
-    while running:
-        sys.stdout.write("$ ") 
-        tokens = tokenize_input(input())
-        if not tokens:
-            continue
-        else:
-            running = handle_command(tokens)
+
 
 
 def tokenize_input(input_line):
@@ -105,6 +103,22 @@ def escaped_mode(char, current_token):
 
     return new_token, new_mode, token_finished
 
+def parse_input(tokens):
+    redirect = None
+    
+    for position, current_item in enumerate(tokens):
+        if current_item in symbols:
+            redirect = tokens[position + 1]
+            command = tokens[0]
+            arguments = tokens[1:position]
+            operation = symbols[tokens[position]]
+            return command, arguments, redirect, operation
+
+    command = tokens[0]
+    arguments = tokens[1:]
+
+    return command, arguments, None, None
+
 
 def handle_command(tokens):
     command, arguments, redirect, operation = parse_input(tokens)
@@ -114,25 +128,6 @@ def handle_command(tokens):
     else:
         return execute_external(command, arguments, redirect, operation)
     
-
-def parse_input(tokens):
-    redirect = None
-    
-    symbols = {">", "1>", "2>", ">>", "1>>"}
-
-    for position, current_item in enumerate(tokens):
-        if current_item in symbols:
-            redirect = tokens[position + 1]
-            command = tokens[0]
-            arguments = tokens[1:position]
-            operation = tokens[position]
-            return command, arguments, redirect, operation
-
-    command = tokens[0]
-    arguments = tokens[1:]
-
-    return command, arguments, None, None
-
 
 def execute_builtin(command, arguments, redirect, operation):
         func = shell_builtins[command]
@@ -144,20 +139,10 @@ def execute_external(command, arguments, redirect, operation):
         absolute_path = os.path.join(directory, command)
         if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
             if redirect:
-                if operation == ">" or operation =="1>":
-                    os.makedirs(os.path.dirname(redirect), exist_ok=True)
-                    with open(redirect, "w") as f:
-                        subprocess.run([absolute_path] + arguments, stdout=f)
-                    return True
-                elif operation == "2>":
-                    os.makedirs(os.path.dirname(redirect), exist_ok=True)
-                    with open(redirect, "w") as f:
-                        subprocess.run([absolute_path] + arguments, stderr=f)
-                    return True
-                else:
-                    with open(redirect, "a") as f:
-                        subprocess.run([absolute_path] + arguments, stdout=f)
-                        return True
+                f, flag = handle_redirect(redirect, operation)
+                subprocess.run([absolute_path] + arguments, **{flag: f})
+                f.close()
+                return True
             else:
                 subprocess.run([command] + arguments, executable=absolute_path)                
                 return True
@@ -165,36 +150,34 @@ def execute_external(command, arguments, redirect, operation):
     print(f"{command}: command not found")
     return True
 
+
+def handle_redirect(redirect, operation):
+    directory = os.path.dirname(redirect)
+    if directory:
+        os.makedirs(directory, exist_ok=True)   
+    f = open(redirect, operation[0])
+    flag = operation[1]
+    
+    return f, flag
+
     
 def echo_cmd(arguments, redirect, operation):
     output = " ".join(arguments)
-
     if redirect:
-        directory = os.path.dirname(redirect)
-        os.makedirs(directory, exist_ok=True)
-
-    if operation == ">" or operation == "1>":
-        with open(redirect, "w") as f:
-            print(output, file=f)
-        return True
-    elif operation =="2>":
-        open(redirect, "w").close()
-        print(output)
-        return True
-    elif operation == ">>" or operation == "1>>":
-        with open(redirect, "a") as f:
-            print(output, file=f)
-        return True
-    else:
-        print(output)
-        return True
+        f, flag = handle_redirect(redirect, operation)
+        if flag == "stdout":
+            print(output, file=f)  
+            f.close()  
+            return True
+    print(output)
+    return True
 
 
 def exit_cmd(arguments=None, redirect=None, operation = None):
     return False
      
 
-def type_cmd(arguments, redirect, operation=None):
+def type_cmd(arguments, redirect, operation):
     if not arguments:
         return True
     
@@ -202,9 +185,10 @@ def type_cmd(arguments, redirect, operation=None):
 
     if target in shell_builtins:
         if redirect:
-            with open(redirect, 'w') as f:
-                print(f"{target} is a shell builtin", file=f)
-                return True
+            f, flag = handle_redirect(redirect, operation)
+            print(f"{target} is a shell builtin", file=f)
+            f.close()
+            return True
         else:
             print( f"{target} is a shell builtin")
             return True
@@ -213,26 +197,29 @@ def type_cmd(arguments, redirect, operation=None):
             absolute_path = os.path.join(directory, target)
             if os.path.exists(absolute_path) and os.access(absolute_path, os.X_OK):
                     if redirect:
-                        with open(redirect, 'w') as f:
-                            print(f"{target} is {absolute_path}", file=f)
-                            return True
+                        f, flag = handle_redirect(redirect, operation)
+                        print(f"{target} is {absolute_path}", file=f)
+                        f.close()
+                        return True
                     else:
                         print(f"{target} is {absolute_path}") 
                         return True
     if redirect:
-        with open(redirect, 'w') as f:
-            print(f"{target}: not found", file=f)
-            return True 
+        f, flag = handle_redirect(redirect, operation)
+        print(f"{target}: not found", file=f)
+        f.close()
+        return True 
     else:
         print(f"{target}: not found") 
         return True
 
 
-def pwd_cmd(arguments, redirect, operation=None):
+def pwd_cmd(arguments, redirect, operation):
     if redirect:
-         with open(redirect, 'w') as f:
-            print(os.getcwd(), file=f)
-            return True
+        f, flag = handle_redirect(redirect, operation)
+        print(os.getcwd(), file=f)
+        f.close()
+        return True
     else:
         print(os.getcwd())
         return True 
@@ -263,6 +250,18 @@ shell_builtins = {"echo": echo_cmd,
                   "pwd": pwd_cmd, 
                   "cd": cd_cmd
                   }
+
+
+def main():
+    running = True
+    while running:
+        sys.stdout.write("$ ") 
+        tokens = tokenize_input(input())
+        if not tokens:
+            continue
+        else:
+            running = handle_command(tokens)
+
 
 
 if __name__ == "__main__":
