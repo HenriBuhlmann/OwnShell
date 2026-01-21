@@ -1,6 +1,7 @@
 import sys
 import os 
 import subprocess
+import readline
 
 symbols = {">":["w", "stdout"],
            "1>":["w", "stdout"],
@@ -8,8 +9,6 @@ symbols = {">":["w", "stdout"],
            ">>":["a", "stdout"],
            "1>>":["a", "stdout"],
            "2>>":["a", "stderr"]}
-
-
 
 
 def tokenize_input(input_line):
@@ -102,6 +101,7 @@ def escaped_mode(char, current_token):
     new_token += char
 
     return new_token, new_mode, token_finished
+
 
 def parse_input(tokens):
     redirect = None
@@ -252,7 +252,17 @@ shell_builtins = {"echo": echo_cmd,
                   }
 
 
+def auto_complete(text, state):
+    matches = [b for b in shell_builtins if b.startswith(text)]
+    try:
+        return matches[state] + " "
+    except IndexError:
+        return None
+
+
 def main():
+    readline.set_completer(auto_complete)
+    readline.parse_and_bind("tab:complete")
     running = True
     while running:
         sys.stdout.write("$ ") 
