@@ -1,5 +1,5 @@
 import sys
-import os 
+import os
 import subprocess
 import readline
 
@@ -253,13 +253,25 @@ shell_builtins = {"echo": echo_cmd,
 
 
 def auto_complete(text, state):
-    matches = [b for b in shell_builtins if b.startswith(text)]
+
+    all_matches = [builtin for builtin in shell_builtins if builtin.startswith(text)]
+
+    if len(all_matches) == 0:
+        for directory in os.environ["PATH"].split(os.pathsep):
+            try:
+                for file in os.listdir(directory):
+                    path = os.path.join(directory, file)
+                    if file.startswith(text) and os.access(path, os.X_OK):
+                        all_matches.append(file)
+            except FileNotFoundError:
+                continue
+
     try:
-        return matches[state] + " "
+        return all_matches[state] + " "
     except IndexError:
         return None
-
-
+   
+   
 def main():
     readline.set_completer(auto_complete)
     readline.parse_and_bind("tab:complete")
