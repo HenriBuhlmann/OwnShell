@@ -185,7 +185,6 @@ def auto_complete(text, state):
     
     return None
 
-
     
 def echo_cmd(arguments, redirect, operation):
     output = " ".join(arguments)
