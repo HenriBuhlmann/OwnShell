@@ -3,6 +3,8 @@ import os
 import subprocess
 import readline
 
+tab_counter = 0
+
 symbols = {">":["w", "stdout"],
            "1>":["w", "stdout"],
            "2>":["w", "stderr"],
@@ -160,6 +162,30 @@ def handle_redirect(redirect, operation):
     
     return f, flag
 
+
+def auto_complete(text, state):
+
+    matches = [b for b in shell_builtins if b.startswith(text)]
+    
+    if not matches:
+        for d in os.environ["PATH"].split(os.pathsep):
+            try:
+                for f in os.listdir(d):
+                    path = os.path.join(d, f)
+                    if f.startswith(text) and os.access(path, os.X_OK):
+                        matches.append(f)
+            except FileNotFoundError:
+                continue
+
+    if state < len(matches):
+        if len(matches) == 1:
+            return matches[state] + " "
+        else:
+            return matches[state]
+    
+    return None
+
+
     
 def echo_cmd(arguments, redirect, operation):
     output = " ".join(arguments)
@@ -250,26 +276,6 @@ shell_builtins = {"echo": echo_cmd,
                   "pwd": pwd_cmd, 
                   "cd": cd_cmd
                   }
-
-
-def auto_complete(text, state):
-
-    all_matches = [builtin for builtin in shell_builtins if builtin.startswith(text)]
-
-    if len(all_matches) == 0:
-        for directory in os.environ["PATH"].split(os.pathsep):
-            try:
-                for file in os.listdir(directory):
-                    path = os.path.join(directory, file)
-                    if file.startswith(text) and os.access(path, os.X_OK):
-                        all_matches.append(file)
-            except FileNotFoundError:
-                continue
-
-    try:
-        return all_matches[state] + " "
-    except IndexError:
-        return None
    
    
 def main():
@@ -277,8 +283,7 @@ def main():
     readline.parse_and_bind("tab:complete")
     running = True
     while running:
-        sys.stdout.write("$ ") 
-        tokens = tokenize_input(input())
+        tokens = tokenize_input(input("$ "))
         if not tokens:
             continue
         else:
